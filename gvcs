@@ -1,0 +1,191 @@
+#!/usr/bin/env ruby
+
+require 'fileutils'
+require 'digest'
+require 'json'
+require 'time'
+
+VCS_DIR = ".gvcs"
+COMMITS_DIR = "#{VCS_DIR}/commits"
+INDEX_FILE = "#{VCS_DIR}/index.json"
+HEAD_FILE = "#{VCS_DIR}/HEAD"
+BRANCHES_DIR = "#{VCS_DIR}/branches"
+
+def init
+  return puts "Repo exists." if Dir.exist?(VCS_DIR)
+
+  Dir.mkdir(VCS_DIR)
+  Dir.mkdir(COMMITS_DIR)
+  Dir.mkdir(BRANCHES_DIR)
+
+  File.write(INDEX_FILE, {}.to_json)
+
+  # default branch
+  File.write("#{BRANCHES_DIR}/main", "")
+  File.write(HEAD_FILE, "main")
+
+  puts "made repo with branch 'main'"
+end
+
+def current_branch
+  File.read(HEAD_FILE).strip
+end
+
+def branch_head(branch)
+  path = "#{BRANCHES_DIR}/#{branch}"
+  return nil unless File.exist?(path)
+  File.read(path).strip
+end
+
+def set_branch_head(branch, commit_id)
+  File.write("#{BRANCHES_DIR}/#{branch}", commit_id)
+end
+
+def load_index
+  JSON.parse(File.read(INDEX_FILE))
+end
+
+def save_index(index)
+  File.write(INDEX_FILE, index.to_json)
+end
+
+def add(file)
+  return puts "File not found" unless File.exist?(file)
+
+  index = load_index
+  index[file] = Digest::SHA1.hexdigest(File.read(file))
+  save_index(index)
+
+  puts "Added #{file}"
+end
+
+def commit(message)
+  index = load_index
+  return puts "Nothing to commit" if index.empty?
+
+  commit_id = Digest::SHA1.hexdigest("#{Time.now}#{rand}")
+  commit_path = "#{COMMITS_DIR}/#{commit_id}"
+
+  Dir.mkdir(commit_path)
+
+  index.each do |file, _|
+    next unless File.exist?(file)
+    FileUtils.mkdir_p(File.dirname("#{commit_path}/#{file}"))
+    FileUtils.cp(file, "#{commit_path}/#{file}")
+  end
+
+  metadata = {
+    message: message,
+    time: Time.now.iso8601,
+    files: index.keys,
+    parent: branch_head(current_branch),
+    branch: current_branch
+  }
+
+  File.write("#{commit_path}/meta.json", metadata.to_json)
+
+  set_branch_head(current_branch, commit_id)
+
+  puts "Committed on #{current_branch}: #{commit_id}"
+end
+
+def log
+  branch = current_branch
+  commit_id = branch_head(branch)
+
+  while commit_id && !commit_id.empty?
+    meta_file = "#{COMMITS_DIR}/#{commit_id}/meta.json"
+    break unless File.exist?(meta_file)
+
+    meta = JSON.parse(File.read(meta_file))
+    puts""
+    puts "Commit: #{commit_id}"
+    puts "Branch: #{meta['branch']}"
+    # add a way to put the file here
+    puts "Date: #{meta['time']}"
+    puts "Message: #{meta['message']}"
+    puts "-"*40
+
+    commit_id = meta['parent']
+  end
+end
+
+def checkout(name)
+  # branch checkout
+  if File.exist?("#{BRANCHES_DIR}/#{name}")
+    File.write(HEAD_FILE, name)
+    commit_id = branch_head(name)
+    restore_commit(commit_id) if commit_id && !commit_id.empty?
+    puts "Switched to branch #{name}"
+  else
+    # commit checkout
+    restore_commit(name)
+  end
+end
+
+def restore_commit(commit_id)
+  commit_path = "#{COMMITS_DIR}/#{commit_id}"
+  return puts "Commit not found" unless Dir.exist?(commit_path)
+
+  Dir.glob("#{commit_path}/**/*").each do |file|
+    next if File.directory?(file)
+    next if file.end_with?("meta.json")
+
+    relative = file.sub("#{commit_path}/", "")
+    FileUtils.mkdir_p(File.dirname(relative))
+    FileUtils.cp(file, relative)
+  end
+
+  puts "Restored #{commit_id}"
+end
+
+def create_branch(name)
+  path = "#{BRANCHES_DIR}/#{name}"
+  return puts "Branch exists" if File.exist?(path)
+
+  current = branch_head(current_branch)
+  File.write(path, current || "")
+
+  puts "Created branch #{name}"
+end
+
+def list_branches
+  branches = Dir.entries(BRANCHES_DIR).reject { |b| b.start_with?(".") }
+  current = current_branch
+
+  branches.each do |b|
+    mark = (b == current) ? "*" : " "
+    puts "#{mark} #{b}"
+  end
+end
+
+# CLI
+case ARGV[0]
+when "init"
+  init
+when "add"
+  add(ARGV[1])
+when "commit"
+  commit(ARGV[1] || "No message")
+when "log"
+  log
+when "checkout"
+  checkout(ARGV[1])
+when "branch"
+  create_branch(ARGV[1])
+when "branches"
+  list_branches
+else
+  puts <<~HELP
+    GVCS - GNU Version Control System
+
+    Commands:
+      init
+      add <file>
+      commit "msg"
+      log
+      checkout <branch|commit>
+      branch <name>
+      branches
+  HELP
+end
