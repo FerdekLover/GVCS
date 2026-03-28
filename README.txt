@@ -1,4 +1,4 @@
-GVCS - GNU Verion Control System
+GVCS - GNU Version Control System
 
 commands:
   gvcs init
