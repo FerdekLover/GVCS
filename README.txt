@@ -9,4 +9,4 @@ commands:
        branch <name>
        branches
 
-put the 'gvcs' file into /usr/local/bin (linux)
+put the 'gvcs' file into /usr/local/bin and make it executable with the command 'chmod +x gvcs' (linux)
