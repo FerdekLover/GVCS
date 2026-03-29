@@ -98,9 +98,10 @@ def log
     break unless File.exist?(meta_file)
 
     meta = JSON.parse(File.read(meta_file))
-    puts ""
+    puts""
     puts "Commit: #{commit_id}"
     puts "Branch: #{meta['branch']}"
+    # add a way to put the file here
     puts "Date: #{meta['time']}"
     puts "Message: #{meta['message']}"
     puts "-"*40
@@ -157,12 +158,60 @@ def list_branches
   end
 end
 
+def rm_commit(commit_id)
+  commit_path = "#{COMMITS_DIR}/#{commit_id}"
+
+  unless Dir.exist?(commit_path)
+    puts "Commit not found"
+    return
+  end
+
+  # Safety check
+  if commit_used_as_parent?(commit_id)
+    puts "Cannot remove commit: it is a parent of another commit"
+    return
+  end
+
+  # Update branches pointing to it
+  Dir.entries(BRANCHES_DIR).each do |branch|
+    next if branch.start_with?(".")
+
+    path = "#{BRANCHES_DIR}/#{branch}"
+    head = File.read(path).strip
+
+    if head == commit_id
+      # move branch back to parent
+      meta = JSON.parse(File.read("#{commit_path}/meta.json"))
+      new_head = meta["parent"] || ""
+      File.write(path, new_head)
+    end
+  end
+
+  FileUtils.rm_rf(commit_path)
+
+  puts "Removed commit #{commit_id}"
+end
+
+def commit_used_as_parent?(commit_id)
+  Dir.entries(COMMITS_DIR).each do |c|
+    next if c.start_with?(".")
+    meta_file = "#{COMMITS_DIR}/#{c}/meta.json"
+    next unless File.exist?(meta_file)
+
+    meta = JSON.parse(File.read(meta_file))
+    return true if meta["parent"] == commit_id
+  end
+  false
+end
+
 # commands
 case ARGV[0]
 when "init"
   init
 when "add"
   add(ARGV[1])
+when "rm"
+  rm_commit(ARGV[1])
 when "commit"
   commit(ARGV[1] || "No message")
 when "log"
@@ -180,6 +229,7 @@ else
     Commands:
       init
       add <file>
+      rm <commit>
       commit "msg"
       log
       checkout <branch|commit>
