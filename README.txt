@@ -3,6 +3,7 @@ GVCS - GNU Version Control System
 commands:
   gvcs init
        add <file>
+       rm <commit>
        commit "msg"
        log
        checkout <branch|commit>
