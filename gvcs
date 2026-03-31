@@ -101,7 +101,7 @@ def log
     puts""
     puts "Commit: #{commit_id}"
     puts "Branch: #{meta['branch']}"
-    # add a way to put the file here
+    # TODO: add a way to put the file here
     puts "Date: #{meta['time']}"
     puts "Message: #{meta['message']}"
     puts "-"*40
