@@ -147,7 +147,7 @@ def create_branch(name)
   current = branch_head(current_branch)
   File.write(path, current || "")
 
-  puts "Created branch #{name}"
+  puts "Created branch '#{name}'"
 end
 
 def list_branches
