@@ -99,9 +99,11 @@ def log
 
     meta = JSON.parse(File.read(meta_file))
     puts""
-    puts "Commit: #{commit_id}"
+    puts "Commit ID: #{commit_id}"
     puts "Branch: #{meta['branch']}"
-    # TODO: add a way to put the file here
+    if meta['files'] && !meta['files'].empty?
+      puts "Files: #{meta['files'].join(', ')}"
+    end
     puts "Date: #{meta['time']}"
     puts "Message: #{meta['message']}"
     puts "-"*40
