@@ -118,7 +118,7 @@ def checkout(name)
     File.write(HEAD_FILE, name)
     commit_id = branch_head(name)
     restore_commit(commit_id) if commit_id && !commit_id.empty?
-    puts "Switched to branch #{name}"
+    puts "Switched to branch '#{name}'"
   else
     restore_commit(name)
   end
@@ -191,7 +191,7 @@ def rm_commit(commit_id)
 
   FileUtils.rm_rf(commit_path)
 
-  puts "Removed commit #{commit_id}"
+  puts "Removed commit '#{commit_id}'"
 end
 
 def commit_used_as_parent?(commit_id)
